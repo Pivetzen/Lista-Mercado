@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <style>
         .item-selected { border-color: #2563eb; background-color: #eff6ff; }
+        .sticky-search { position: sticky; top: 64px; z-index: 15; }
     </style>
 </head>
 <body class="bg-gray-50 pb-32">
@@ -20,6 +21,14 @@
         </div>
     </header>
 
+    <div class="bg-gray-50 p-4 sticky-search border-b">
+        <div class="max-w-4xl mx-auto">
+            <input type="text" id="inputBusca" oninput="filtrarProdutos()" 
+                placeholder="🔍 Pesquisar item..." 
+                class="w-full p-3 rounded-xl border border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+        </div>
+    </div>
+
     <main class="max-w-4xl mx-auto p-4 space-y-8">
         <section>
             <h2 class="text-sm font-bold text-gray-400 uppercase mb-4">Catálogo de Produtos</h2>
@@ -28,27 +37,26 @@
         </section>
 
         <section id="sessao-compras" class="hidden border-t pt-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4">Valores e Quantidades</h2>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4">Sua Lista para Preencher</h2>
             <div id="lista-ativa" class="space-y-3">
                 </div>
         </section>
     </main>
 
-    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30">
+    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30 shadow-2xl">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
             <div>
                 <p class="text-gray-400 text-xs uppercase font-bold">Total da Compra</p>
                 <p id="total-geral" class="text-3xl font-black text-blue-600">R$ 0,00</p>
             </div>
-            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition shadow-lg">
+            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition">
                 Gerar Lista
             </button>
         </div>
     </footer>
 
     <script>
-        // CONFIGURAÇÃO: Cole aqui o link CSV do seu Google Sheets
-        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv";
+        const LINK_PLANILHA = "SUA_URL_AQUI"; // Cole seu link CSV aqui
 
         let produtosBase = [];
         let carrinho = [];
@@ -67,34 +75,42 @@
                         nome: colunas[1]?.trim() || 'Produto sem nome'
                     };
                 });
-                renderizarCatalogo();
-            } catch (e) { console.error("Erro ao carregar dados"); }
+                renderizarCatalogo(produtosBase);
+            } catch (e) { console.error("Erro ao carregar"); }
         }
 
-        function renderizarCatalogo() {
+        function renderizarCatalogo(lista) {
             const container = document.getElementById('catalogo');
-            container.innerHTML = produtosBase.map(p => `
-                <div onclick="toggleItem(${p.id})" id="card-${p.id}" class="bg-white border rounded-xl p-2 cursor-pointer transition hover:shadow-md">
+            container.innerHTML = lista.map(p => {
+                const estaNoCarrinho = carrinho.some(item => item.id === p.id);
+                return `
+                <div onclick="toggleItem(${p.id})" id="card-${p.id}" 
+                    class="bg-white border rounded-xl p-2 cursor-pointer transition hover:shadow-md ${estaNoCarrinho ? 'item-selected' : ''}">
                     <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2">
                     <p class="text-xs font-bold text-center text-gray-700 truncate">${p.nome}</p>
                 </div>
-            `).join('');
+            `}).join('');
+        }
+
+        function filtrarProdutos() {
+            const termo = document.getElementById('inputBusca').value.toLowerCase();
+            const filtrados = produtosBase.filter(p => 
+                p.nome.toLowerCase().includes(termo)
+            );
+            renderizarCatalogo(filtrados);
         }
 
         function toggleItem(id) {
             const idx = carrinho.findIndex(item => item.id === id);
-            const card = document.getElementById(`card-${id}`);
-
             if (idx > -1) {
                 carrinho.splice(idx, 1);
-                card.classList.remove('item-selected');
             } else {
                 const p = produtosBase.find(item => item.id === id);
                 carrinho.push({ ...p, qtd: 1, preco: 0 });
-                card.classList.add('item-selected');
             }
             
             document.getElementById('contador').innerText = `${carrinho.length} itens`;
+            filtrarProdutos(); // Re-renderiza o catálogo mantendo o filtro
             atualizarListaTrabalho();
         }
 
@@ -106,19 +122,18 @@
             sessao.classList.remove('hidden');
 
             container.innerHTML = carrinho.map((item, i) => `
-                <div class="bg-white border rounded-xl p-4 flex items-center gap-4 animate-in fade-in">
+                <div class="bg-white border rounded-xl p-4 flex items-center gap-4">
                     <img src="${item.foto}" class="w-12 h-12 object-cover rounded">
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate">${item.nome}</p>
                         <div class="flex gap-2 mt-2">
                             <input type="number" value="${item.qtd}" oninput="updateVal(${i}, 'qtd', this.value)" 
-                                class="w-16 border rounded-lg p-1 text-sm text-center" placeholder="Qtd">
+                                class="w-16 border rounded-lg p-1 text-sm text-center" placeholder="Qt">
                             <input type="number" step="0.01" oninput="updateVal(${i}, 'preco', this.value)" 
-                                class="w-24 border rounded-lg p-1 text-sm text-right" placeholder="R$ Preço">
+                                class="w-24 border rounded-lg p-1 text-sm text-right" placeholder="R$">
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="text-xs text-gray-400 uppercase font-bold">Subtotal</p>
                         <p class="font-black text-gray-900">R$ ${(item.qtd * item.preco).toFixed(2)}</p>
                     </div>
                 </div>
@@ -129,7 +144,6 @@
         function updateVal(i, key, val) {
             carrinho[i][key] = parseFloat(val) || 0;
             calcTotal();
-            // Atualiza apenas os números sem reconstruir a lista para não perder o foco do input
             const subtotalText = document.querySelectorAll('#lista-ativa div .font-black')[i];
             subtotalText.innerText = `R$ ${(carrinho[i].qtd * carrinho[i].preco).toFixed(2)}`;
         }
@@ -142,22 +156,15 @@
         function gerarPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.setFontSize(20);
-            doc.text("Minha Lista de Compras", 14, 20);
-            
+            doc.text("Resumo de Compras", 14, 20);
             const rows = carrinho.map(i => [i.nome, i.qtd, `R$ ${i.preco.toFixed(2)}`, `R$ ${(i.qtd * i.preco).toFixed(2)}`]);
-            const total = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
-
             doc.autoTable({
                 head: [['Produto', 'Qtd', 'Unitário', 'Total']],
                 body: rows,
                 startY: 30,
-                theme: 'striped',
-                headStyles: { fillColor: [37, 99, 235] }
+                headStyles: { fillColor: [31, 41, 55] }
             });
-
-            doc.text(`Total Final: R$ ${total.toFixed(2)}`, 14, doc.lastAutoTable.finalY + 10);
-            doc.save("lista-supermercado.pdf");
+            doc.save("lista.pdf");
         }
 
         carregarPlanilha();
