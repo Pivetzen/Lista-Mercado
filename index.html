@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <style>
-        .item-selected { border-color: #2563eb; background-color: #eff6ff; }
+        .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; }
         .sticky-search { position: sticky; top: 64px; z-index: 15; }
     </style>
 </head>
@@ -17,27 +17,30 @@
     <header class="bg-white border-b sticky top-0 z-20 p-4 shadow-sm">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-black text-gray-800 tracking-tight">SHOPLIST.IO</h1>
-            <span id="contador" class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-full">0 itens</span>
+            <div class="flex items-center gap-3">
+                <button onclick="limparLista()" class="text-xs font-bold text-red-500 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50">Limpar Tudo</button>
+                <span id="contador" class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-full">0 itens</span>
+            </div>
         </div>
     </header>
 
     <div class="bg-gray-50 p-4 sticky-search border-b">
         <div class="max-w-4xl mx-auto">
             <input type="text" id="inputBusca" oninput="filtrarProdutos()" 
-                placeholder="🔍 Pesquisar item..." 
+                placeholder="🔍 Pesquisar no catálogo..." 
                 class="w-full p-3 rounded-xl border border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
         </div>
     </div>
 
     <main class="max-w-4xl mx-auto p-4 space-y-8">
         <section>
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4">Catálogo de Produtos</h2>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo</h2>
             <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 </div>
         </section>
 
         <section id="sessao-compras" class="hidden border-t pt-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4">Sua Lista para Preencher</h2>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual</h2>
             <div id="lista-ativa" class="space-y-3">
                 </div>
         </section>
@@ -46,17 +49,17 @@
     <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30 shadow-2xl">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-xs uppercase font-bold">Total da Compra</p>
+                <p class="text-gray-400 text-xs uppercase font-bold">Total Estimado</p>
                 <p id="total-geral" class="text-3xl font-black text-blue-600">R$ 0,00</p>
             </div>
-            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition">
-                Gerar Lista
+            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg active:scale-95">
+                Exportar PDF
             </button>
         </div>
     </footer>
 
     <script>
-        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv"; // Cole seu link CSV aqui
+        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv"; // SUBSTITUA PELO SEU LINK CSV
 
         let produtosBase = [];
         let carrinho = [];
@@ -72,11 +75,11 @@
                     return {
                         id: i,
                         foto: colunas[0]?.trim() || 'https://via.placeholder.com/150',
-                        nome: colunas[1]?.trim() || 'Produto sem nome'
+                        nome: colunas[1]?.trim() || 'Sem nome'
                     };
                 });
                 renderizarCatalogo(produtosBase);
-            } catch (e) { console.error("Erro ao carregar"); }
+            } catch (e) { console.error("Erro ao ler Planilha"); }
         }
 
         function renderizarCatalogo(lista) {
@@ -86,17 +89,15 @@
                 return `
                 <div onclick="toggleItem(${p.id})" id="card-${p.id}" 
                     class="bg-white border rounded-xl p-2 cursor-pointer transition hover:shadow-md ${estaNoCarrinho ? 'item-selected' : ''}">
-                    <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2">
-                    <p class="text-xs font-bold text-center text-gray-700 truncate">${p.nome}</p>
+                    <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2 pointer-events-none">
+                    <p class="text-xs font-bold text-center text-gray-700 truncate pointer-events-none">${p.nome}</p>
                 </div>
             `}).join('');
         }
 
         function filtrarProdutos() {
             const termo = document.getElementById('inputBusca').value.toLowerCase();
-            const filtrados = produtosBase.filter(p => 
-                p.nome.toLowerCase().includes(termo)
-            );
+            const filtrados = produtosBase.filter(p => p.nome.toLowerCase().includes(termo));
             renderizarCatalogo(filtrados);
         }
 
@@ -108,9 +109,8 @@
                 const p = produtosBase.find(item => item.id === id);
                 carrinho.push({ ...p, qtd: 1, preco: 0 });
             }
-            
             document.getElementById('contador').innerText = `${carrinho.length} itens`;
-            filtrarProdutos(); // Re-renderiza o catálogo mantendo o filtro
+            filtrarProdutos(); 
             atualizarListaTrabalho();
         }
 
@@ -122,15 +122,15 @@
             sessao.classList.remove('hidden');
 
             container.innerHTML = carrinho.map((item, i) => `
-                <div class="bg-white border rounded-xl p-4 flex items-center gap-4">
-                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded">
+                <div class="bg-white border rounded-xl p-4 flex items-center gap-4 border-l-4 border-l-blue-500 shadow-sm">
+                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded shadow-inner">
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate">${item.nome}</p>
                         <div class="flex gap-2 mt-2">
                             <input type="number" value="${item.qtd}" oninput="updateVal(${i}, 'qtd', this.value)" 
-                                class="w-16 border rounded-lg p-1 text-sm text-center" placeholder="Qt">
+                                class="w-16 border rounded-lg p-2 text-sm text-center font-bold" placeholder="Qt">
                             <input type="number" step="0.01" oninput="updateVal(${i}, 'preco', this.value)" 
-                                class="w-24 border rounded-lg p-1 text-sm text-right" placeholder="R$">
+                                class="w-24 border rounded-lg p-2 text-sm text-right font-bold text-green-700" placeholder="R$ 0,00">
                         </div>
                     </div>
                     <div class="text-right">
@@ -153,18 +153,37 @@
             document.getElementById('total-geral').innerText = `R$ ${t.toFixed(2)}`;
         }
 
+        function limparLista() {
+            if(confirm("Deseja apagar todos os itens da lista atual?")) {
+                carrinho = [];
+                document.getElementById('contador').innerText = `0 itens`;
+                document.getElementById('inputBusca').value = "";
+                renderizarCatalogo(produtosBase);
+                atualizarListaTrabalho();
+                calcTotal();
+            }
+        }
+
         function gerarPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text("Resumo de Compras", 14, 20);
+            doc.setFontSize(22);
+            doc.text("LISTA DE COMPRAS", 14, 20);
+            
             const rows = carrinho.map(i => [i.nome, i.qtd, `R$ ${i.preco.toFixed(2)}`, `R$ ${(i.qtd * i.preco).toFixed(2)}`]);
+            const total = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
+
             doc.autoTable({
-                head: [['Produto', 'Qtd', 'Unitário', 'Total']],
+                head: [['Produto', 'Qtd', 'Preço Unit.', 'Subtotal']],
                 body: rows,
                 startY: 30,
-                headStyles: { fillColor: [31, 41, 55] }
+                theme: 'grid',
+                headStyles: { fillColor: [17, 24, 39], fontStyle: 'bold' },
+                foot: [['', '', 'TOTAL:', `R$ ${total.toFixed(2)}`]],
+                footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' }
             });
-            doc.save("lista.pdf");
+
+            doc.save(`lista-supermercado-${new Date().toLocaleDateString()}.pdf`);
         }
 
         carregarPlanilha();
