@@ -11,17 +11,32 @@
         .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; transform: scale(0.98); }
         .sticky-search { position: sticky; top: 60px; z-index: 15; }
         
-        /* Garante que as setas de quantidade apareçam em todos os navegadores */
+        /* Estilização dos campos de quantidade */
         input[type=number].qtd-input::-webkit-inner-spin-button, 
         input[type=number].qtd-input::-webkit-outer-spin-button { 
             opacity: 1;
             height: 30px;
         }
+
+        /* Área do Carrinho Fixo na Base */
+        #container-carrinho-fixo {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            z-index: 40;
+            border-top: 2px solid #e5e7eb;
+            box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        #lista-ativa {
+            max-height: 300px;
+            overflow-y: auto;
+        }
     </style>
 </head>
-<body class="bg-gray-50 pb-40">
-
-    <header class="bg-white border-b sticky top-0 z-20 p-4 shadow-sm">
+<body class="bg-gray-50 pb-[500px]"> <header class="bg-white border-b sticky top-0 z-20 p-4 shadow-sm">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-black text-gray-800 tracking-tight">SHOPLIST.IO</h1>
             <div class="flex items-center gap-3">
@@ -39,29 +54,33 @@
         </div>
     </div>
 
-    <main class="max-w-4xl mx-auto p-4 space-y-8">
+    <main class="max-w-4xl mx-auto p-4">
         <section>
             <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo</h2>
             <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
         </section>
-
-        <section id="sessao-compras" class="hidden border-t pt-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual</h2>
-            <div id="lista-ativa" class="space-y-3"></div>
-        </section>
     </main>
 
-    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30 shadow-[0_-10px_20px_rgba(0,0,0,0,0.05)]">
-        <div class="max-w-4xl mx-auto flex items-center justify-between">
-            <div>
-                <p class="text-gray-400 text-xs uppercase font-bold">Total Estimado</p>
-                <p id="total-geral" class="text-3xl font-black text-blue-600">R$ 0,00</p>
+    <div id="container-carrinho-fixo" class="hidden">
+        <div class="max-w-4xl mx-auto">
+            <div class="p-3 bg-gray-100 flex justify-between items-center border-b">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-widest">Carrinho Atual</h2>
+                <button onclick="document.getElementById('lista-ativa').classList.toggle('hidden')" class="text-[10px] font-bold text-blue-600 underline">Minimizar/Expandir</button>
             </div>
-            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg flex items-center gap-2">
-                Exportar PDF
-            </button>
+            
+            <div id="lista-ativa" class="p-4 space-y-3"></div>
+
+            <div class="p-4 bg-white border-t flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-[10px] uppercase font-bold">Total Estimado</p>
+                    <p id="total-geral" class="text-2xl font-black text-blue-600">R$ 0,00</p>
+                </div>
+                <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition shadow-lg flex items-center gap-2 text-sm">
+                    Exportar PDF
+                </button>
+            </div>
         </div>
-    </footer>
+    </div>
 
     <script>
         const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv";
@@ -84,21 +103,11 @@
             } catch (e) { console.error(e); }
         }
 
-        // --- LÓGICA DE MÁSCARA FINANCEIRA ---
         function formatarMoedaInput(inputElement, index) {
-            // Pega apenas os números digitados
             let valor = inputElement.value.replace(/\D/g, "");
-            
-            // Transforma em centavos (ex: 123 vira 1.23)
             let numerico = (parseFloat(valor) / 100) || 0;
-            
-            // Atualiza o objeto do carrinho
             carrinho[index].preco = numerico;
-            
-            // Exibe formatado no input
             inputElement.value = numerico.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-            
-            // Atualiza subtotal visual e geral
             atualizarSubtotalVisual(index);
             localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
             calcTotal();
@@ -150,35 +159,33 @@
 
         function atualizarListaTrabalho() {
             const container = document.getElementById('lista-ativa');
-            const sessao = document.getElementById('sessao-compras');
-            if(carrinho.length === 0) { sessao.classList.add('hidden'); calcTotal(); return; }
-            sessao.classList.remove('hidden');
+            const carrinhoFixo = document.getElementById('container-carrinho-fixo');
+            
+            if(carrinho.length === 0) { 
+                carrinhoFixo.classList.add('hidden'); 
+                calcTotal();
+                return; 
+            }
+            carrinhoFixo.classList.remove('hidden');
 
             container.innerHTML = carrinho.map((item, i) => `
-                <div class="bg-white border rounded-xl p-4 flex items-center gap-4 border-l-4 border-l-blue-500 shadow-sm">
-                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded bg-gray-50">
+                <div class="bg-white border rounded-lg p-3 flex items-center gap-3 border-l-4 border-l-blue-500 shadow-sm text-sm">
+                    <img src="${item.foto}" class="w-10 h-10 object-cover rounded bg-gray-50">
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate">${item.nome}</p>
-                        <div class="flex gap-2 mt-2">
-                            <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 font-bold uppercase">Qtd</span>
-                                <input type="number" value="${item.qtd}" min="1" 
-                                    oninput="updateQtd(${i}, this.value)" 
-                                    class="qtd-input w-20 border rounded-lg p-2 text-sm text-center font-bold outline-none border-gray-300">
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-[10px] text-gray-400 font-bold uppercase">Preço Unit.</span>
-                                <input type="text" 
-                                    value="${item.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}" 
-                                    oninput="formatarMoedaInput(this, ${i})"
-                                    onclick="this.setSelectionRange(this.value.length, this.value.length)"
-                                    class="w-28 border rounded-lg p-2 text-sm text-right font-bold text-green-700 outline-none border-gray-300">
-                            </div>
+                        <div class="flex gap-2 mt-1">
+                            <input type="number" value="${item.qtd}" min="1" 
+                                oninput="updateQtd(${i}, this.value)" 
+                                class="qtd-input w-16 border rounded p-1 text-xs text-center font-bold outline-none">
+                            <input type="text" 
+                                value="${item.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}" 
+                                oninput="formatarMoedaInput(this, ${i})"
+                                class="w-24 border rounded p-1 text-xs text-right font-bold text-green-700 outline-none">
                         </div>
                     </div>
-                    <div class="text-right flex flex-col justify-end">
-                        <span class="text-[10px] text-gray-400 font-bold uppercase">Subtotal</span>
-                        <p class="font-black text-gray-900" id="subtotal-${i}">R$ ${(item.qtd * item.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                    <div class="text-right">
+                        <p class="font-black text-gray-900 text-xs" id="subtotal-${i}">R$ ${(item.qtd * item.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        <button onclick="toggleItem(${item.id})" class="text-[9px] text-red-400 font-bold uppercase mt-1">Remover</button>
                     </div>
                 </div>`).join('');
             calcTotal();
@@ -209,14 +216,9 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             doc.setFontSize(18); doc.text("LISTA DE COMPRAS", 14, 20);
-            doc.setFontSize(9); doc.setTextColor(100);
-            doc.text(`Data: ${new Date().toLocaleString('pt-BR')}`, 14, 26);
-
+            
             const rows = carrinho.map(i => [
-                "", // Checkbox
-                i.nome.toUpperCase(), 
-                "", // OBS
-                i.qtd, 
+                "", i.nome.toUpperCase(), "", i.qtd, 
                 `R$ ${i.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 
                 `R$ ${(i.qtd * i.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
             ]);
@@ -227,20 +229,8 @@
                 startY: 32,
                 theme: 'grid',
                 headStyles: { fillColor: [37, 99, 235], fontStyle: 'bold', halign: 'center' },
-                columnStyles: {
-                    0: { cellWidth: 10, halign: 'center' },
-                    1: { cellWidth: 50 },
-                    2: { cellWidth: 45 },
-                    3: { cellWidth: 15, halign: 'center' },
-                    4: { halign: 'right' },
-                    5: { halign: 'right' }
-                },
-                didDrawCell: (data) => {
-                    if (data.section === 'body' && data.column.index === 0) {
-                        doc.setDrawColor(180);
-                        doc.rect(data.cell.x + 2.5, data.cell.y + 2, 5, 5);
-                    }
-                },
+                columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 50 }, 2: { cellWidth: 45 }, 3: { cellWidth: 15, halign: 'center' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+                didDrawCell: (data) => { if (data.section === 'body' && data.column.index === 0) { doc.setDrawColor(180); doc.rect(data.cell.x + 2.5, data.cell.y + 2, 5, 5); } },
                 foot: [['', '', '', '', 'TOTAL:', `R$ ${carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`]],
                 footStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold', halign: 'right' }
             });
