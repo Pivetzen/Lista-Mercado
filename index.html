@@ -3,23 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Supermercado Pro</title>
+    <title>SHOPLIST.IO - Lista de Supermercado</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <style>
-        .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; }
-        .sticky-search { position: sticky; top: 64px; z-index: 15; }
+        .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; transform: scale(0.98); }
+        .sticky-search { position: sticky; top: 60px; z-index: 15; }
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
     </style>
 </head>
-<body class="bg-gray-50 pb-32">
+<body class="bg-gray-50 pb-40">
 
     <header class="bg-white border-b sticky top-0 z-20 p-4 shadow-sm">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-black text-gray-800 tracking-tight">SHOPLIST.IO</h1>
             <div class="flex items-center gap-3">
-                <button onclick="limparLista()" class="text-xs font-bold text-red-500 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50">Limpar Tudo</button>
-                <span id="contador" class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-full">0 itens</span>
+                <button onclick="limparLista()" class="text-xs font-bold text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Limpar Tudo</button>
+                <span id="contador" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">0 itens</span>
             </div>
         </div>
     </header>
@@ -28,58 +30,65 @@
         <div class="max-w-4xl mx-auto">
             <input type="text" id="inputBusca" oninput="filtrarProdutos()" 
                 placeholder="🔍 Pesquisar no catálogo..." 
-                class="w-full p-3 rounded-xl border border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                class="w-full p-4 rounded-2xl border border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition text-lg">
         </div>
     </div>
 
     <main class="max-w-4xl mx-auto p-4 space-y-8">
         <section>
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo</h2>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo de Produtos</h2>
             <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 </div>
         </section>
 
         <section id="sessao-compras" class="hidden border-t pt-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual</h2>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual (Valores)</h2>
             <div id="lista-ativa" class="space-y-3">
                 </div>
         </section>
     </main>
 
-    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30 shadow-2xl">
+    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-30 shadow-[0_-10px_20px_rgba(0,0,0,0,0.05)]">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
             <div>
                 <p class="text-gray-400 text-xs uppercase font-bold">Total Estimado</p>
                 <p id="total-geral" class="text-3xl font-black text-blue-600">R$ 0,00</p>
             </div>
-            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg active:scale-95">
-                Exportar PDF
+            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg active:scale-95 flex items-center gap-2">
+                <span>Exportar PDF</span>
             </button>
         </div>
     </footer>
 
     <script>
-        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv"; // SUBSTITUA PELO SEU LINK CSV
+        // --- CONFIGURAÇÃO ---
+        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv";
 
         let produtosBase = [];
-        let carrinho = [];
+        let carrinho = JSON.parse(localStorage.getItem('carrinho_shoplist')) || [];
 
+        // Inicia a aplicação
         async function carregarPlanilha() {
             try {
                 const res = await fetch(LINK_PLANILHA);
                 const csv = await res.text();
-                const linhas = csv.split('\n').slice(1);
+                const linhas = csv.split(/\r?\n/).slice(1);
                 
-                produtosBase = linhas.map((linha, i) => {
-                    const colunas = linha.split(',');
+                produtosBase = linhas.filter(l => l.trim() !== "").map((linha, i) => {
+                    const delimitador = linha.includes(';') ? ';' : ',';
+                    const colunas = linha.split(delimitador);
                     return {
                         id: i,
                         foto: colunas[0]?.trim() || 'https://via.placeholder.com/150',
                         nome: colunas[1]?.trim() || 'Sem nome'
                     };
                 });
+                
                 renderizarCatalogo(produtosBase);
-            } catch (e) { console.error("Erro ao ler Planilha"); }
+                atualizarListaTrabalho();
+            } catch (e) { 
+                console.error("Erro ao carregar dados:", e);
+            }
         }
 
         function renderizarCatalogo(lista) {
@@ -87,12 +96,13 @@
             container.innerHTML = lista.map(p => {
                 const estaNoCarrinho = carrinho.some(item => item.id === p.id);
                 return `
-                <div onclick="toggleItem(${p.id})" id="card-${p.id}" 
-                    class="bg-white border rounded-xl p-2 cursor-pointer transition hover:shadow-md ${estaNoCarrinho ? 'item-selected' : ''}">
-                    <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2 pointer-events-none">
-                    <p class="text-xs font-bold text-center text-gray-700 truncate pointer-events-none">${p.nome}</p>
-                </div>
-            `}).join('');
+                    <div onclick="toggleItem(${p.id})" id="card-${p.id}" 
+                        class="bg-white border rounded-xl p-2 cursor-pointer transition-all duration-200 hover:shadow-md ${estaNoCarrinho ? 'item-selected' : ''}">
+                        <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2 pointer-events-none">
+                        <p class="text-[10px] sm:text-xs font-bold text-center text-gray-700 truncate pointer-events-none uppercase">${p.nome}</p>
+                    </div>
+                `;
+            }).join('');
         }
 
         function filtrarProdutos() {
@@ -109,6 +119,11 @@
                 const p = produtosBase.find(item => item.id === id);
                 carrinho.push({ ...p, qtd: 1, preco: 0 });
             }
+            salvarEPresentar();
+        }
+
+        function salvarEPresentar() {
+            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
             document.getElementById('contador').innerText = `${carrinho.length} itens`;
             filtrarProdutos(); 
             atualizarListaTrabalho();
@@ -118,23 +133,34 @@
             const container = document.getElementById('lista-ativa');
             const sessao = document.getElementById('sessao-compras');
             
-            if(carrinho.length === 0) { sessao.classList.add('hidden'); return; }
+            if(carrinho.length === 0) { 
+                sessao.classList.add('hidden'); 
+                calcTotal();
+                return; 
+            }
             sessao.classList.remove('hidden');
 
             container.innerHTML = carrinho.map((item, i) => `
                 <div class="bg-white border rounded-xl p-4 flex items-center gap-4 border-l-4 border-l-blue-500 shadow-sm">
-                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded shadow-inner">
+                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded shadow-inner bg-gray-50">
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate">${item.nome}</p>
                         <div class="flex gap-2 mt-2">
-                            <input type="number" value="${item.qtd}" oninput="updateVal(${i}, 'qtd', this.value)" 
-                                class="w-16 border rounded-lg p-2 text-sm text-center font-bold" placeholder="Qt">
-                            <input type="number" step="0.01" oninput="updateVal(${i}, 'preco', this.value)" 
-                                class="w-24 border rounded-lg p-2 text-sm text-right font-bold text-green-700" placeholder="R$ 0,00">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400 font-bold uppercase">Qtd</span>
+                                <input type="number" value="${item.qtd}" oninput="updateVal(${i}, 'qtd', this.value)" 
+                                    class="w-16 border rounded-lg p-2 text-sm text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400 font-bold uppercase">Preço Unit.</span>
+                                <input type="number" step="0.01" value="${item.preco}" oninput="updateVal(${i}, 'preco', this.value)" 
+                                    class="w-28 border rounded-lg p-2 text-sm text-right font-bold text-green-700 focus:ring-2 focus:ring-green-500 outline-none">
+                            </div>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="font-black text-gray-900">R$ ${(item.qtd * item.preco).toFixed(2)}</p>
+                    <div class="text-right flex flex-col justify-end">
+                        <span class="text-[10px] text-gray-400 font-bold uppercase">Subtotal</span>
+                        <p class="font-black text-gray-900" id="subtotal-${i}">R$ ${(item.qtd * item.preco).toFixed(2)}</p>
                     </div>
                 </div>
             `).join('');
@@ -143,19 +169,23 @@
 
         function updateVal(i, key, val) {
             carrinho[i][key] = parseFloat(val) || 0;
+            const subtotalEl = document.getElementById(`subtotal-${i}`);
+            if(subtotalEl) {
+                subtotalEl.innerText = `R$ ${(carrinho[i].qtd * carrinho[i].preco).toFixed(2)}`;
+            }
+            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
             calcTotal();
-            const subtotalText = document.querySelectorAll('#lista-ativa div .font-black')[i];
-            subtotalText.innerText = `R$ ${(carrinho[i].qtd * carrinho[i].preco).toFixed(2)}`;
         }
 
         function calcTotal() {
             const t = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
-            document.getElementById('total-geral').innerText = `R$ ${t.toFixed(2)}`;
+            document.getElementById('total-geral').innerText = `R$ ${t.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
         }
 
         function limparLista() {
             if(confirm("Deseja apagar todos os itens da lista atual?")) {
                 carrinho = [];
+                localStorage.removeItem('carrinho_shoplist');
                 document.getElementById('contador').innerText = `0 itens`;
                 document.getElementById('inputBusca').value = "";
                 renderizarCatalogo(produtosBase);
@@ -165,25 +195,37 @@
         }
 
         function gerarPDF() {
+            if(carrinho.length === 0) return alert("Adicione itens à lista primeiro!");
+            
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.setFontSize(22);
-            doc.text("LISTA DE COMPRAS", 14, 20);
             
-            const rows = carrinho.map(i => [i.nome, i.qtd, `R$ ${i.preco.toFixed(2)}`, `R$ ${(i.qtd * i.preco).toFixed(2)}`]);
+            doc.setFontSize(20);
+            doc.text("MINHA LISTA DE COMPRAS", 14, 20);
+            
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
+            
+            const rows = carrinho.map(i => [
+                i.nome.toUpperCase(), 
+                i.qtd, 
+                `R$ ${i.preco.toFixed(2)}`, 
+                `R$ ${(i.qtd * i.preco).toFixed(2)}`
+            ]);
+
             const total = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
 
             doc.autoTable({
-                head: [['Produto', 'Qtd', 'Preço Unit.', 'Subtotal']],
+                head: [['PRODUTO', 'QTD', 'UNITÁRIO', 'SUBTOTAL']],
                 body: rows,
-                startY: 30,
+                startY: 35,
                 theme: 'grid',
                 headStyles: { fillColor: [17, 24, 39], fontStyle: 'bold' },
-                foot: [['', '', 'TOTAL:', `R$ ${total.toFixed(2)}`]],
+                foot: [['', '', 'TOTAL GERAL:', `R$ ${total.toFixed(2)}`]],
                 footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' }
             });
 
-            doc.save(`lista-supermercado-${new Date().toLocaleDateString()}.pdf`);
+            doc.save(`lista-compras-${new Date().toISOString().split('T')[0]}.pdf`);
         }
 
         carregarPlanilha();
