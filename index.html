@@ -10,8 +10,8 @@
     <style>
         .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; transform: scale(0.98); }
         .sticky-search { position: sticky; top: 60px; z-index: 15; }
-        input[type="number"]::-webkit-inner-spin-button, 
-        input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
+        /* Remove setas padrão de input number */
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body class="bg-gray-50 pb-40">
@@ -36,15 +36,13 @@
 
     <main class="max-w-4xl mx-auto p-4 space-y-8">
         <section>
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo de Produtos</h2>
-            <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                </div>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Catálogo</h2>
+            <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
         </section>
 
         <section id="sessao-compras" class="hidden border-t pt-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual (Valores)</h2>
-            <div id="lista-ativa" class="space-y-3">
-                </div>
+            <h2 class="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">Carrinho Atual</h2>
+            <div id="lista-ativa" class="space-y-3"></div>
         </section>
     </main>
 
@@ -54,14 +52,13 @@
                 <p class="text-gray-400 text-xs uppercase font-bold">Total Estimado</p>
                 <p id="total-geral" class="text-3xl font-black text-blue-600">R$ 0,00</p>
             </div>
-            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg active:scale-95 flex items-center gap-2">
-                <span>Exportar PDF</span>
+            <button onclick="gerarPDF()" class="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition shadow-lg flex items-center gap-2">
+                Exportar PDF
             </button>
         </div>
     </footer>
 
     <script>
-        // --- CONFIGURAÇÃO ---
         const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtoJflKYT3Iyln786UIJmC3bwtcebWos62fIXBKNH7HDMOOa0S1Pvky6dXzOSLJl4co9ZOUms1ns8/pub?gid=0&single=true&output=csv";
 
         let produtosBase = [];
@@ -72,22 +69,32 @@
                 const res = await fetch(LINK_PLANILHA);
                 const csv = await res.text();
                 const linhas = csv.split(/\r?\n/).slice(1);
-                
                 produtosBase = linhas.filter(l => l.trim() !== "").map((linha, i) => {
                     const delimitador = linha.includes(';') ? ';' : ',';
                     const colunas = linha.split(delimitador);
-                    return {
-                        id: i,
-                        foto: colunas[0]?.trim() || 'https://via.placeholder.com/150',
-                        nome: colunas[1]?.trim() || 'Sem nome'
-                    };
+                    return { id: i, foto: colunas[0]?.trim() || 'https://via.placeholder.com/150', nome: colunas[1]?.trim() || 'Sem nome' };
                 });
-                
                 renderizarCatalogo(produtosBase);
                 atualizarListaTrabalho();
-            } catch (e) { 
-                console.error("Erro ao carregar dados:", e);
+            } catch (e) { console.error(e); }
+        }
+
+        // Função de Máscara de Moeda Dinâmica
+        function formatarMoedaInput(inputElement, index) {
+            let valor = inputElement.value.replace(/\D/g, "");
+            let numerico = (parseFloat(valor) / 100) || 0;
+            
+            // Atualiza o valor no input para o usuário ver (formato R$ 0,00)
+            inputElement.value = numerico.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            
+            // Atualiza o dado no carrinho e recalcula
+            carrinho[index].preco = numerico;
+            const subtotalEl = document.getElementById(`subtotal-${index}`);
+            if(subtotalEl) {
+                subtotalEl.innerText = `R$ ${(carrinho[index].qtd * carrinho[index].preco).toFixed(2)}`;
             }
+            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
+            calcTotal();
         }
 
         function renderizarCatalogo(lista) {
@@ -99,8 +106,7 @@
                         class="bg-white border rounded-xl p-2 cursor-pointer transition-all duration-200 hover:shadow-md ${estaNoCarrinho ? 'item-selected' : ''}">
                         <img src="${p.foto}" class="w-full h-24 object-contain rounded-lg mb-2 pointer-events-none">
                         <p class="text-[10px] sm:text-xs font-bold text-center text-gray-700 truncate pointer-events-none uppercase">${p.nome}</p>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
 
@@ -112,9 +118,8 @@
 
         function toggleItem(id) {
             const idx = carrinho.findIndex(item => item.id === id);
-            if (idx > -1) {
-                carrinho.splice(idx, 1);
-            } else {
+            if (idx > -1) { carrinho.splice(idx, 1); } 
+            else {
                 const p = produtosBase.find(item => item.id === id);
                 carrinho.push({ ...p, qtd: 1, preco: 0 });
             }
@@ -131,29 +136,25 @@
         function atualizarListaTrabalho() {
             const container = document.getElementById('lista-ativa');
             const sessao = document.getElementById('sessao-compras');
-            
-            if(carrinho.length === 0) { 
-                sessao.classList.add('hidden'); 
-                calcTotal();
-                return; 
-            }
+            if(carrinho.length === 0) { sessao.classList.add('hidden'); calcTotal(); return; }
             sessao.classList.remove('hidden');
 
             container.innerHTML = carrinho.map((item, i) => `
                 <div class="bg-white border rounded-xl p-4 flex items-center gap-4 border-l-4 border-l-blue-500 shadow-sm">
-                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded shadow-inner bg-gray-50">
+                    <img src="${item.foto}" class="w-12 h-12 object-cover rounded bg-gray-50">
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate">${item.nome}</p>
                         <div class="flex gap-2 mt-2">
                             <div class="flex flex-col">
                                 <span class="text-[10px] text-gray-400 font-bold uppercase">Qtd</span>
-                                <input type="number" value="${item.qtd}" oninput="updateVal(${i}, 'qtd', this.value)" 
-                                    class="w-16 border rounded-lg p-2 text-sm text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                <input type="number" value="${item.qtd}" oninput="updateQtd(${i}, this.value)" 
+                                    class="w-16 border rounded-lg p-2 text-sm text-center font-bold outline-none">
                             </div>
                             <div class="flex flex-col">
                                 <span class="text-[10px] text-gray-400 font-bold uppercase">Preço Unit.</span>
-                                <input type="number" step="0.01" value="${item.preco}" oninput="updateVal(${i}, 'preco', this.value)" 
-                                    class="w-28 border rounded-lg p-2 text-sm text-right font-bold text-green-700 focus:ring-2 focus:ring-green-500 outline-none">
+                                <input type="text" value="${item.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}" 
+                                    oninput="formatarMoedaInput(this, ${i})" 
+                                    class="w-28 border rounded-lg p-2 text-sm text-right font-bold text-green-700 outline-none">
                             </div>
                         </div>
                     </div>
@@ -161,17 +162,14 @@
                         <span class="text-[10px] text-gray-400 font-bold uppercase">Subtotal</span>
                         <p class="font-black text-gray-900" id="subtotal-${i}">R$ ${(item.qtd * item.preco).toFixed(2)}</p>
                     </div>
-                </div>
-            `).join('');
+                </div>`).join('');
             calcTotal();
         }
 
-        function updateVal(i, key, val) {
-            carrinho[i][key] = parseFloat(val) || 0;
+        function updateQtd(i, val) {
+            carrinho[i].qtd = parseFloat(val) || 0;
             const subtotalEl = document.getElementById(`subtotal-${i}`);
-            if(subtotalEl) {
-                subtotalEl.innerText = `R$ ${(carrinho[i].qtd * carrinho[i].preco).toFixed(2)}`;
-            }
+            if(subtotalEl) subtotalEl.innerText = `R$ ${(carrinho[i].qtd * carrinho[i].preco).toFixed(2)}`;
             localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
             calcTotal();
         }
@@ -182,70 +180,54 @@
         }
 
         function limparLista() {
-            if(confirm("Deseja apagar todos os itens da lista atual?")) {
-                carrinho = [];
-                localStorage.removeItem('carrinho_shoplist');
+            if(confirm("Deseja apagar tudo?")) {
+                carrinho = []; localStorage.removeItem('carrinho_shoplist');
                 document.getElementById('contador').innerText = `0 itens`;
-                document.getElementById('inputBusca').value = "";
-                renderizarCatalogo(produtosBase);
-                atualizarListaTrabalho();
-                calcTotal();
+                renderizarCatalogo(produtosBase); atualizarListaTrabalho(); calcTotal();
             }
         }
 
         function gerarPDF() {
-            if(carrinho.length === 0) return alert("Adicione itens à lista primeiro!");
-            
+            if(carrinho.length === 0) return alert("Lista vazia!");
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            
-            doc.setFontSize(20);
-            doc.text("MINHA LISTA DE COMPRAS", 14, 20);
-            
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
-            
-            // Adicionamos uma coluna vazia no início para o checkbox
+            doc.setFontSize(18); doc.text("LISTA DE COMPRAS", 14, 20);
+            doc.setFontSize(9); doc.setTextColor(100);
+            doc.text(`Data: ${new Date().toLocaleString('pt-BR')}`, 14, 26);
+
             const rows = carrinho.map(i => [
-                "", // Espaço para o checkbox
+                "", // Checkbox
                 i.nome.toUpperCase(), 
+                "", // Especificação (Vazio para escrever)
                 i.qtd, 
                 `R$ ${i.preco.toFixed(2)}`, 
                 `R$ ${(i.qtd * i.preco).toFixed(2)}`
             ]);
 
-            const total = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
-
             doc.autoTable({
-                head: [['OK', 'PRODUTO', 'QTD', 'UNITÁRIO', 'SUBTOTAL']],
+                head: [['OK', 'PRODUTO', 'OBS / MARCA', 'QTD', 'UNIT.', 'SUBTOTAL']],
                 body: rows,
-                startY: 35,
+                startY: 32,
                 theme: 'grid',
                 headStyles: { fillColor: [37, 99, 235], fontStyle: 'bold', halign: 'center' },
                 columnStyles: {
-                    0: { cellWidth: 12, halign: 'center' }, // Coluna do Checkbox
-                    2: { halign: 'center' },
-                    3: { halign: 'right' },
-                    4: { halign: 'right' }
+                    0: { cellWidth: 10, halign: 'center' },
+                    1: { cellWidth: 50 },
+                    2: { cellWidth: 45 }, // Espaço para observação
+                    3: { cellWidth: 15, halign: 'center' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' }
                 },
-                foot: [['', '', '', 'TOTAL GERAL:', `R$ ${total.toFixed(2)}`]],
-                footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'right' },
-                
-                // Esta função desenha o quadradinho em cada linha da coluna 0
                 didDrawCell: (data) => {
                     if (data.section === 'body' && data.column.index === 0) {
-                        const size = 5; // Tamanho do quadrado
-                        const x = data.cell.x + (data.cell.width / 2) - (size / 2);
-                        const y = data.cell.y + (data.cell.height / 2) - (size / 2);
-                        
-                        doc.setDrawColor(150); // Cor da borda do quadrado (cinza)
-                        doc.rect(x, y, size, size); // Desenha o retângulo
+                        doc.setDrawColor(180);
+                        doc.rect(data.cell.x + 2.5, data.cell.y + 2, 5, 5);
                     }
-                }
+                },
+                foot: [['', '', '', '', 'TOTAL:', `R$ ${carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0).toFixed(2)}`]],
+                footStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold', halign: 'right' }
             });
-
-            doc.save(`lista-compras-${new Date().toISOString().split('T')[0]}.pdf`);
+            doc.save(`lista-${new Date().toISOString().split('T')[0]}.pdf`);
         }
 
         carregarPlanilha();
