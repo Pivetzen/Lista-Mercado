@@ -67,7 +67,6 @@
         let produtosBase = [];
         let carrinho = JSON.parse(localStorage.getItem('carrinho_shoplist')) || [];
 
-        // Inicia a aplicação
         async function carregarPlanilha() {
             try {
                 const res = await fetch(LINK_PLANILHA);
@@ -204,9 +203,12 @@
             doc.text("MINHA LISTA DE COMPRAS", 14, 20);
             
             doc.setFontSize(10);
+            doc.setTextColor(100);
             doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
             
+            // Adicionamos uma coluna vazia no início para o checkbox
             const rows = carrinho.map(i => [
+                "", // Espaço para o checkbox
                 i.nome.toUpperCase(), 
                 i.qtd, 
                 `R$ ${i.preco.toFixed(2)}`, 
@@ -216,13 +218,31 @@
             const total = carrinho.reduce((acc, i) => acc + (i.qtd * i.preco), 0);
 
             doc.autoTable({
-                head: [['PRODUTO', 'QTD', 'UNITÁRIO', 'SUBTOTAL']],
+                head: [['OK', 'PRODUTO', 'QTD', 'UNITÁRIO', 'SUBTOTAL']],
                 body: rows,
                 startY: 35,
                 theme: 'grid',
-                headStyles: { fillColor: [17, 24, 39], fontStyle: 'bold' },
-                foot: [['', '', 'TOTAL GERAL:', `R$ ${total.toFixed(2)}`]],
-                footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' }
+                headStyles: { fillColor: [37, 99, 235], fontStyle: 'bold', halign: 'center' },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center' }, // Coluna do Checkbox
+                    2: { halign: 'center' },
+                    3: { halign: 'right' },
+                    4: { halign: 'right' }
+                },
+                foot: [['', '', '', 'TOTAL GERAL:', `R$ ${total.toFixed(2)}`]],
+                footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'right' },
+                
+                // Esta função desenha o quadradinho em cada linha da coluna 0
+                didDrawCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 0) {
+                        const size = 5; // Tamanho do quadrado
+                        const x = data.cell.x + (data.cell.width / 2) - (size / 2);
+                        const y = data.cell.y + (data.cell.height / 2) - (size / 2);
+                        
+                        doc.setDrawColor(150); // Cor da borda do quadrado (cinza)
+                        doc.rect(x, y, size, size); // Desenha o retângulo
+                    }
+                }
             });
 
             doc.save(`lista-compras-${new Date().toISOString().split('T')[0]}.pdf`);
