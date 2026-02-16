@@ -11,10 +11,12 @@
         .item-selected { border: 3px solid #2563eb !important; background-color: #eff6ff; transform: scale(0.98); }
         .sticky-search { position: sticky; top: 60px; z-index: 15; }
         
+        /* Garante que as setas de quantidade apareçam e sejam fáceis de clicar */
         input[type=number].qtd-input::-webkit-inner-spin-button, 
         input[type=number].qtd-input::-webkit-outer-spin-button { 
             opacity: 1;
             height: 24px;
+            cursor: pointer;
         }
 
         #container-carrinho-fixo {
@@ -29,12 +31,14 @@
         }
 
         #lista-ativa {
-            max-height: 200px; /* Reduzido para ocupar menos tela */
+            max-height: 200px;
             overflow-y: auto;
         }
     </style>
 </head>
-<body class="bg-gray-50 pb-[350px]"> <header class="bg-white border-b sticky top-0 z-20 p-3 shadow-sm">
+<body class="bg-gray-50 pb-[350px]">
+
+    <header class="bg-white border-b sticky top-0 z-20 p-3 shadow-sm">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
             <h1 class="text-lg font-black text-gray-800 tracking-tight">SHOPLIST.IO</h1>
             <div class="flex items-center gap-3">
@@ -53,16 +57,13 @@
     </div>
 
     <main class="max-w-4xl mx-auto p-3">
-        <section>
-            <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></div>
-        </section>
+        <div id="catalogo" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></div>
     </main>
 
     <div id="container-carrinho-fixo" class="hidden">
         <div class="max-w-4xl mx-auto">
             <div class="px-3 py-1 bg-gray-50 flex justify-between items-center border-b">
                 <h2 class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Carrinho (Novos no topo)</h2>
-                <button onclick="document.getElementById('lista-ativa').classList.toggle('hidden')" class="text-[9px] font-bold text-blue-600">Minimizar</button>
             </div>
             
             <div id="lista-ativa" class="p-2 space-y-2"></div>
@@ -100,22 +101,39 @@
             } catch (e) { console.error(e); }
         }
 
-        function formatarMoedaInput(inputElement, index) {
-            let valor = inputElement.value.replace(/\D/g, "");
-            let numerico = (parseFloat(valor) / 100) || 0;
-            carrinho[index].preco = numerico;
-            inputElement.value = numerico.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        // --- MÁSCARA FINANCEIRA PARA PREÇO ---
+        function aplicarMascaraPreco(input, index) {
+            let v = input.value.replace(/\D/g, "");
+            let n = (parseFloat(v) / 100).toFixed(2);
+            
+            if (v.length === 0) n = "0.00";
+            
+            carrinho[index].preco = parseFloat(n);
+            input.value = carrinho[index].preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            
             atualizarSubtotalVisual(index);
-            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
-            calcTotal();
+            salvarLocalStorage();
+        }
+
+        // --- LÓGICA PARA QUANTIDADE ---
+        function updateQtd(index, val, input) {
+            // Se o usuário apagar tudo, deixamos o campo vazio mas o valor interno como 0
+            if (val === "") {
+                carrinho[index].qtd = 0;
+            } else {
+                carrinho[index].qtd = parseFloat(val);
+            }
+            atualizarSubtotalVisual(index);
+            salvarLocalStorage();
         }
 
         function atualizarSubtotalVisual(index) {
-            const subtotalEl = document.getElementById(`subtotal-${index}`);
-            if(subtotalEl) {
+            const el = document.getElementById(`subtotal-${index}`);
+            if (el) {
                 const total = carrinho[index].qtd * carrinho[index].preco;
-                subtotalEl.innerText = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                el.innerText = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
             }
+            calcTotal();
         }
 
         function renderizarCatalogo(lista) {
@@ -143,17 +161,21 @@
                 carrinho.splice(idx, 1); 
             } else {
                 const p = produtosBase.find(item => item.id === id);
-                // unshift adiciona no INÍCIO da lista
-                carrinho.unshift({ ...p, qtd: 1, preco: 0 });
+                // Adiciona com preco 0 e qtd 0 (vazio) para forçar o preenchimento
+                carrinho.unshift({ ...p, qtd: 0, preco: 0 });
             }
             salvarEPresentar();
         }
 
         function salvarEPresentar() {
-            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
+            salvarLocalStorage();
             document.getElementById('contador').innerText = `${carrinho.length} itens`;
             filtrarProdutos(); 
             atualizarListaTrabalho();
+        }
+
+        function salvarLocalStorage() {
+            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
         }
 
         function atualizarListaTrabalho() {
@@ -173,25 +195,25 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-gray-800 truncate text-[11px]">${item.nome}</p>
                         <div class="flex gap-1 mt-1">
-                            <input type="number" value="${item.qtd}" min="1" oninput="updateQtd(${i}, this.value)" 
-                                class="qtd-input w-12 border rounded p-0.5 text-center font-bold">
-                            <input type="text" value="${item.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}" 
-                                oninput="formatarMoedaInput(this, ${i})"
-                                class="w-20 border rounded p-0.5 text-right font-bold text-green-700">
+                            <input type="number" 
+                                placeholder="Qtd"
+                                value="${item.qtd === 0 ? '' : item.qtd}" 
+                                onfocus="if(this.value=='0')this.value=''"
+                                oninput="updateQtd(${i}, this.value, this)" 
+                                class="qtd-input w-14 border rounded p-0.5 text-center font-bold border-gray-300 outline-none focus:border-blue-500">
+                            
+                            <input type="text" 
+                                value="${item.preco === 0 ? '0,00' : item.preco.toLocaleString('pt-BR', {minimumFractionDigits: 2})}" 
+                                oninput="aplicarMascaraPreco(this, ${i})"
+                                onfocus="this.select()"
+                                class="w-20 border rounded p-0.5 text-right font-bold text-green-700 border-gray-300 outline-none focus:border-green-500">
                         </div>
                     </div>
-                    <div class="text-right min-w-[70px]">
+                    <div class="text-right min-w-[75px]">
                         <p class="font-black text-gray-900 text-[10px]" id="subtotal-${i}">R$ ${(item.qtd * item.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                        <button onclick="toggleItem(${item.id})" class="text-[8px] text-red-500 font-bold uppercase">Remover</button>
+                        <button onclick="toggleItem(${item.id})" class="text-[8px] text-red-500 font-bold uppercase mt-1">Remover</button>
                     </div>
                 </div>`).join('');
-            calcTotal();
-        }
-
-        function updateQtd(i, val) {
-            carrinho[i].qtd = parseFloat(val) || 0;
-            atualizarSubtotalVisual(i);
-            localStorage.setItem('carrinho_shoplist', JSON.stringify(carrinho));
             calcTotal();
         }
 
@@ -202,7 +224,7 @@
 
         function limparLista() {
             if(confirm("Deseja apagar tudo?")) {
-                carrinho = []; localStorage.removeItem('carrinho_shoplist');
+                carrinho = []; salvarLocalStorage();
                 document.getElementById('contador').innerText = `0 itens`;
                 renderizarCatalogo(produtosBase); atualizarListaTrabalho(); calcTotal();
             }
